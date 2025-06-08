@@ -47,35 +47,42 @@ export default function RoomPage({ params }: RoomPageProps) {
     });
   }, [params]);
   
-  // Stable user info with localStorage persistence
+  // Stable user info with proper client-side checks
   const [myUserId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("userId") || uuidv4();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = localStorage.getItem("userId");
+      if (stored) return stored;
     }
     return uuidv4();
   });
   
   const [myUserName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("userName") || `User${Math.floor(Math.random() * 1000)}`;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = localStorage.getItem("userName");
+      if (stored) return stored;
     }
     return `User${Math.floor(Math.random() * 1000)}`;
   });
   
   const [myColor] = useState(() => {
     const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem("userColor") || colors[Math.floor(Math.random() * colors.length)];
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = localStorage.getItem("userColor");
+      if (stored) return stored;
     }
     return colors[Math.floor(Math.random() * colors.length)];
   });
 
-  // Store user info in localStorage
+  // Store user info in localStorage safely
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("userId", myUserId);
-      localStorage.setItem("userName", myUserName);
-      localStorage.setItem("userColor", myColor);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem("userId", myUserId);
+        localStorage.setItem("userName", myUserName);
+        localStorage.setItem("userColor", myColor);
+      } catch (error) {
+        console.warn("Failed to save user info to localStorage:", error);
+      }
     }
   }, [myUserId, myUserName, myColor]);
 
@@ -121,23 +128,29 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Cursor position updates with throttling
   const updateCursorPosition = useCallback(
-    debounce(async (x: number, y: number) => {
-      if (!sessionId) return;
-      
-      try {
-        await supabase.from("participants").upsert({
-          session_id: sessionId,
-          user_id: myUserId,
-          user_name: myUserName,
-          color: myColor,
-          cursor_x: x,
-          cursor_y: y,
-          last_seen: new Date().toISOString(),
-        });
-      } catch (error) {
-        console.error("Error updating cursor position:", error);
-      }
-    }, 50),
+    (function() {
+      let timeout: NodeJS.Timeout | null = null;
+      return async (x: number, y: number) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(async () => {
+          if (!sessionId) return;
+          
+          try {
+            await supabase.from("participants").upsert({
+              session_id: sessionId,
+              user_id: myUserId,
+              user_name: myUserName,
+              color: myColor,
+              cursor_x: x,
+              cursor_y: y,
+              last_seen: new Date().toISOString(),
+            });
+          } catch (error) {
+            console.error("Error updating cursor position:", error);
+          }
+        }, 50);
+      };
+    })(),
     [sessionId, myUserId, myUserName, myColor]
   );
 
@@ -278,7 +291,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   ]);
 
   // Idea management functions
-  const addIdea = async (e: React.MouseEvent) => {
+  const addIdea = useCallback(async (e: React.MouseEvent) => {
     if (isDragging || !sessionId) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -301,7 +314,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     } catch (error) {
       console.error("Error adding idea:", error);
     }
-  };
+  }, [isDragging, sessionId]);
 
   const updateIdeaPosition = async (id: string, x: number, y: number) => {
     try {
@@ -334,7 +347,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     }
   };
 
-  const addRandomIdea = () => {
+  const addRandomIdea = useCallback(() => {
     if (!sessionId) return;
     
     const x = Math.random() * (window.innerWidth - 200);
@@ -347,7 +360,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     } as React.MouseEvent;
     
     addIdea(syntheticEvent);
-  };
+  }, [sessionId, addIdea]);
 
   // Show loading state while params are being resolved
   if (!sessionId) {
@@ -475,11 +488,14 @@ export default function RoomPage({ params }: RoomPageProps) {
   );
 }
 
-// Debounce helper function
-function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
+// Debounce helper function (keeping for other potential uses)
+function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
+  fn: T, 
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
   return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => fn(...args), delay);
   };
 }
