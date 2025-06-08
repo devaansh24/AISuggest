@@ -9,9 +9,9 @@ import Chat from "@/components/Chat";
 import { v4 as uuidv4 } from "uuid";
 
 type RoomPageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 interface Idea {
@@ -34,11 +34,18 @@ interface Participant {
 }
 
 export default function RoomPage({ params }: RoomPageProps) {
-  const sessionId = params.id;
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [otherParticipants, setOtherParticipants] = useState<Participant[]>([]);
+  
+  // Resolve params Promise
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setSessionId(resolvedParams.id);
+    });
+  }, [params]);
   
   // Stable user info with localStorage persistence
   const [myUserId] = useState(() => {
@@ -74,29 +81,33 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Join/leave session
   const joinSession = useCallback(async () => {
-  try {
-    const { error } = await supabase
-      .from("participants")
-      .upsert(
-        {
-          session_id: sessionId,
-          user_id: myUserId,
-          user_name: myUserName,
-          color: myColor,
-          cursor_x: 0,
-          cursor_y: 0,
-          last_seen: new Date().toISOString(),
-        },
-        { onConflict: "session_id,user_id" } // Specify the conflict columns
-      );
+    if (!sessionId) return;
+    
+    try {
+      const { error } = await supabase
+        .from("participants")
+        .upsert(
+          {
+            session_id: sessionId,
+            user_id: myUserId,
+            user_name: myUserName,
+            color: myColor,
+            cursor_x: 0,
+            cursor_y: 0,
+            last_seen: new Date().toISOString(),
+          },
+          { onConflict: "session_id,user_id" } // Specify the conflict columns
+        );
 
-    if (error) throw error;
-  } catch (error) {
-    console.error("Error joining session:", error);
-  }
-}, [sessionId, myUserId, myUserName, myColor]);
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error joining session:", error);
+    }
+  }, [sessionId, myUserId, myUserName, myColor]);
 
   const leaveSession = useCallback(async () => {
+    if (!sessionId) return;
+    
     try {
       await supabase
         .from("participants")
@@ -111,6 +122,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   // Cursor position updates with throttling
   const updateCursorPosition = useCallback(
     debounce(async (x: number, y: number) => {
+      if (!sessionId) return;
+      
       try {
         await supabase.from("participants").upsert({
           session_id: sessionId,
@@ -130,6 +143,8 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Subscribe to cursor movements
   const subscribeToCursors = useCallback(() => {
+    if (!sessionId) return () => {};
+    
     const channel = supabase
       .channel(`participants_${sessionId}`)
       .on(
@@ -175,6 +190,8 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Fetch and subscribe to ideas
   const fetchIdeas = useCallback(async () => {
+    if (!sessionId) return;
+    
     try {
       const { data, error } = await supabase
         .from("ideas")
@@ -190,6 +207,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   }, [sessionId]);
 
   const subscribeToIdeas = useCallback(() => {
+    if (!sessionId) return () => {};
+    
     const channel = supabase
       .channel(`ideas_${sessionId}`)
       .on(
@@ -229,6 +248,8 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Setup all subscriptions and cleanup
   useEffect(() => {
+    if (!sessionId) return;
+    
     fetchIdeas();
     const unsubscribeIdeas = subscribeToIdeas();
     joinSession();
@@ -247,6 +268,7 @@ export default function RoomPage({ params }: RoomPageProps) {
       unsubscribeCursors();
     };
   }, [
+    sessionId,
     fetchIdeas,
     subscribeToIdeas,
     joinSession,
@@ -257,7 +279,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Idea management functions
   const addIdea = async (e: React.MouseEvent) => {
-    if (isDragging) return;
+    if (isDragging || !sessionId) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.max(0, e.clientX - rect.left - 75);
@@ -313,6 +335,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   };
 
   const addRandomIdea = () => {
+    if (!sessionId) return;
+    
     const x = Math.random() * (window.innerWidth - 200);
     const y = Math.random() * (window.innerHeight - 200) + 100;
     
@@ -324,6 +348,15 @@ export default function RoomPage({ params }: RoomPageProps) {
     
     addIdea(syntheticEvent);
   };
+
+  // Show loading state while params are being resolved
+  if (!sessionId) {
+    return (
+      <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-lg text-gray-600">Loading room...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 relative overflow-hidden">
