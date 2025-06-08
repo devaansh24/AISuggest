@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -6,6 +7,12 @@ import { Plus, Users } from "lucide-react";
 import LiveCursor from "@/components/LiveCursor";
 import Chat from "@/components/Chat";
 import { v4 as uuidv4 } from "uuid";
+
+type RoomPageProps = {
+  params: {
+    id: string;
+  };
+};
 
 interface Idea {
   id: string;
@@ -26,7 +33,7 @@ interface Participant {
   last_seen: string;
 }
 
-export default function RoomPage({ params }: { params: { id: string } }) {
+export default function RoomPage({ params }: RoomPageProps) {
   const sessionId = params.id;
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
