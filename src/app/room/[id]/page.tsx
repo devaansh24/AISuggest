@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { Plus, Users, MessageCircle } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import LiveCursor from "@/components/LiveCursor";
 import Chat from "@/components/Chat";
 import { v4 as uuidv4 } from "uuid";
