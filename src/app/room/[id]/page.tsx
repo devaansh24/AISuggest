@@ -103,7 +103,7 @@ export default function RoomPage({ params }: RoomPageProps) {
             cursor_y: 0,
             last_seen: new Date().toISOString(),
           },
-          { onConflict: "session_id,user_id" } // Specify the conflict columns
+          { onConflict: "session_id,user_id" }
         );
 
       if (error) throw error;
@@ -259,44 +259,22 @@ export default function RoomPage({ params }: RoomPageProps) {
     };
   }, [sessionId]);
 
-  // Setup all subscriptions and cleanup
-  useEffect(() => {
-    if (!sessionId) return;
-    
-    fetchIdeas();
-    const unsubscribeIdeas = subscribeToIdeas();
-    joinSession();
-    const unsubscribeCursors = subscribeToCursors();
-
-    const handleMouseMove = (e: MouseEvent) => {
-      updateCursorPosition(e.clientX, e.clientY);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      leaveSession();
-      unsubscribeIdeas();
-      unsubscribeCursors();
-    };
-  }, [
-    sessionId,
-    fetchIdeas,
-    subscribeToIdeas,
-    joinSession,
-    subscribeToCursors,
-    updateCursorPosition,
-    leaveSession,
-  ]);
-
   // Idea management functions
-  const addIdea = useCallback(async (e: React.MouseEvent) => {
+  const addIdea = useCallback(async (eventOrCoords: React.MouseEvent | { x: number; y: number }) => {
     if (isDragging || !sessionId) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, e.clientX - rect.left - 75);
-    const y = Math.max(0, e.clientY - rect.top - 50);
+    let x: number, y: number;
+
+    if ('clientX' in eventOrCoords) {
+      // Handle real mouse event
+      const rect = eventOrCoords.currentTarget.getBoundingClientRect();
+      x = Math.max(0, eventOrCoords.clientX - rect.left - 75);
+      y = Math.max(0, eventOrCoords.clientY - rect.top - 50);
+    } else {
+      // Handle programmatic coordinates
+      x = Math.max(0, eventOrCoords.x);
+      y = Math.max(0, eventOrCoords.y);
+    }
 
     const colors = ["#fbbf24", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#06b6d4"];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -315,6 +293,15 @@ export default function RoomPage({ params }: RoomPageProps) {
       console.error("Error adding idea:", error);
     }
   }, [isDragging, sessionId]);
+
+  const addRandomIdea = useCallback(() => {
+    if (!sessionId) return;
+    
+    const x = Math.random() * (window.innerWidth - 200);
+    const y = Math.random() * (window.innerHeight - 200) + 100;
+    
+    addIdea({ x, y });
+  }, [sessionId, addIdea]);
 
   const updateIdeaPosition = async (id: string, x: number, y: number) => {
     try {
@@ -347,20 +334,36 @@ export default function RoomPage({ params }: RoomPageProps) {
     }
   };
 
-  const addRandomIdea = useCallback(() => {
+  // Setup all subscriptions and cleanup
+  useEffect(() => {
     if (!sessionId) return;
     
-    const x = Math.random() * (window.innerWidth - 200);
-    const y = Math.random() * (window.innerHeight - 200) + 100;
-    
-    const syntheticEvent = {
-      currentTarget: document.body,
-      clientX: x + 75,
-      clientY: y + 50,
-    } as React.MouseEvent;
-    
-    addIdea(syntheticEvent);
-  }, [sessionId, addIdea]);
+    fetchIdeas();
+    const unsubscribeIdeas = subscribeToIdeas();
+    joinSession();
+    const unsubscribeCursors = subscribeToCursors();
+
+    const handleMouseMove = (e: MouseEvent) => {
+      updateCursorPosition(e.clientX, e.clientY);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      leaveSession();
+      unsubscribeIdeas();
+      unsubscribeCursors();
+    };
+  }, [
+    sessionId,
+    fetchIdeas,
+    subscribeToIdeas,
+    joinSession,
+    subscribeToCursors,
+    updateCursorPosition,
+    leaveSession,
+  ]);
 
   // Show loading state while params are being resolved
   if (!sessionId) {
