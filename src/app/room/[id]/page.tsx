@@ -476,7 +476,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 }
 
 // Debounce helper function
-function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number) {
+function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout;
   return (...args: Parameters<T>) => {
     clearTimeout(timeout);
