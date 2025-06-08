@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { Plus, Users } from "lucide-react";
@@ -39,6 +39,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [otherParticipants, setOtherParticipants] = useState<Participant[]>([]);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Resolve params Promise
   useEffect(() => {
@@ -127,32 +128,27 @@ export default function RoomPage({ params }: RoomPageProps) {
   }, [sessionId, myUserId]);
 
   // Cursor position updates with throttling
-  const updateCursorPosition = useCallback(
-    (function() {
-      let timeout: NodeJS.Timeout | null = null;
-      return async (x: number, y: number) => {
-        if (timeout) clearTimeout(timeout);
-        timeout = setTimeout(async () => {
-          if (!sessionId) return;
-          
-          try {
-            await supabase.from("participants").upsert({
-              session_id: sessionId,
-              user_id: myUserId,
-              user_name: myUserName,
-              color: myColor,
-              cursor_x: x,
-              cursor_y: y,
-              last_seen: new Date().toISOString(),
-            });
-          } catch (error) {
-            console.error("Error updating cursor position:", error);
-          }
-        }, 50);
-      };
-    })(),
-    [sessionId, myUserId, myUserName, myColor]
-  );
+  const updateCursorPosition = useCallback(async (x: number, y: number) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    timeoutRef.current = setTimeout(async () => {
+      if (!sessionId) return;
+      
+      try {
+        await supabase.from("participants").upsert({
+          session_id: sessionId,
+          user_id: myUserId,
+          user_name: myUserName,
+          color: myColor,
+          cursor_x: x,
+          cursor_y: y,
+          last_seen: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("Error updating cursor position:", error);
+      }
+    }, 50);
+  }, [sessionId, myUserId, myUserName, myColor]);
 
   // Subscribe to cursor movements
   const subscribeToCursors = useCallback(() => {
@@ -351,6 +347,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       leaveSession();
       unsubscribeIdeas();
       unsubscribeCursors();
@@ -489,16 +486,4 @@ export default function RoomPage({ params }: RoomPageProps) {
       ))}
     </div>
   );
-}
-
-// Debounce helper function (keeping for other potential uses)
-function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
-  fn: T, 
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), delay);
-  };
 }
