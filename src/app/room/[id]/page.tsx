@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { Plus, Users } from "lucide-react";
@@ -34,12 +35,52 @@ interface Participant {
 }
 
 export default function RoomPage({ params }: RoomPageProps) {
+  const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [otherParticipants, setOtherParticipants] = useState<Participant[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // User info state
+  const [myUserId, setMyUserId] = useState<string>("");
+  const [myUserName, setMyUserName] = useState<string>("");
+  const [myColor, setMyColor] = useState<string>("");
+  
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check authentication and set user info
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        
+        if (!user) {
+          router.push("/");
+          return;
+        }
+        
+        setUser(user);
+        setMyUserId(user.id);
+        setMyUserName(user.email?.split("@")[0] || "Anonymous");
+        
+        // Set a consistent color for the authenticated user
+        const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+        const userColorIndex = user.id.charCodeAt(0) % colors.length;
+        setMyColor(colors[userColorIndex]);
+        
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error checking user:", err);
+        router.push("/");
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
   
   // Resolve params Promise
   useEffect(() => {
@@ -47,49 +88,10 @@ export default function RoomPage({ params }: RoomPageProps) {
       setSessionId(resolvedParams.id);
     });
   }, [params]);
-  
-  // Stable user info with proper client-side checks
-  const [myUserId] = useState(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const stored = localStorage.getItem("userId");
-      if (stored) return stored;
-    }
-    return uuidv4();
-  });
-  
-  const [myUserName] = useState(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const stored = localStorage.getItem("userName");
-      if (stored) return stored;
-    }
-    return `User${Math.floor(Math.random() * 1000)}`;
-  });
-  
-  const [myColor] = useState(() => {
-    const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const stored = localStorage.getItem("userColor");
-      if (stored) return stored;
-    }
-    return colors[Math.floor(Math.random() * colors.length)];
-  });
-
-  // Store user info in localStorage safely
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        localStorage.setItem("userId", myUserId);
-        localStorage.setItem("userName", myUserName);
-        localStorage.setItem("userColor", myColor);
-      } catch (error) {
-        console.warn("Failed to save user info to localStorage:", error);
-      }
-    }
-  }, [myUserId, myUserName, myColor]);
 
   // Join/leave session
   const joinSession = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !myUserId) return;
     
     try {
       const { error } = await supabase
@@ -114,7 +116,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   }, [sessionId, myUserId, myUserName, myColor]);
 
   const leaveSession = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !myUserId) return;
     
     try {
       await supabase
@@ -129,11 +131,11 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Cursor position updates with throttling
   const updateCursorPosition = useCallback(async (x: number, y: number) => {
+    if (!sessionId || !myUserId) return;
+    
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
     timeoutRef.current = setTimeout(async () => {
-      if (!sessionId) return;
-      
       try {
         await supabase.from("participants").upsert({
           session_id: sessionId,
@@ -152,7 +154,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Subscribe to cursor movements
   const subscribeToCursors = useCallback(() => {
-    if (!sessionId) return () => {};
+    if (!sessionId || !myUserId) return () => {};
     
     const channel = supabase
       .channel(`participants_${sessionId}`)
@@ -263,7 +265,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 
     if ('clientX' in eventOrCoords) {
       // Handle real mouse event
-      const rect = eventOrCoords.currentTarget.getBoundingClientRect();
+      const rect = (eventOrCoords.currentTarget as HTMLElement).getBoundingClientRect();
       x = Math.max(0, eventOrCoords.clientX - rect.left - 75);
       y = Math.max(0, eventOrCoords.clientY - rect.top - 50);
     } else {
@@ -332,7 +334,7 @@ export default function RoomPage({ params }: RoomPageProps) {
 
   // Setup all subscriptions and cleanup
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !myUserId || isLoading) return;
     
     fetchIdeas();
     const unsubscribeIdeas = subscribeToIdeas();
@@ -354,6 +356,8 @@ export default function RoomPage({ params }: RoomPageProps) {
     };
   }, [
     sessionId,
+    myUserId,
+    isLoading,
     fetchIdeas,
     subscribeToIdeas,
     joinSession,
@@ -362,8 +366,8 @@ export default function RoomPage({ params }: RoomPageProps) {
     leaveSession,
   ]);
 
-  // Show loading state while params are being resolved
-  if (!sessionId) {
+  // Show loading state while authenticating or params are being resolved
+  if (isLoading || !sessionId || !myUserId) {
     return (
       <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-lg text-gray-600">Loading room...</div>
@@ -401,6 +405,17 @@ export default function RoomPage({ params }: RoomPageProps) {
           <p>• Double-click to edit content</p>
           <p>• Click × to delete</p>
           <p>• Use chat to discuss ideas</p>
+        </div>
+      </div>
+
+      {/* User Info */}
+      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-xl shadow-lg z-10 border border-white/20">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: myColor }}
+          ></div>
+          <span>Welcome, {myUserName}</span>
         </div>
       </div>
 
