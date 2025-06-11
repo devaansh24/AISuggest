@@ -91,7 +91,7 @@ export default function Dashboard() {
     }
   }, []); // Empty dependency array to prevent infinite loops
 
-  // Fixed: Remove fetchRooms dependency to prevent infinite loops
+  // Fixed: Remove fetchRooms dependency and use useCallback properly
   const checkUser = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -110,12 +110,12 @@ export default function Dashboard() {
       setError("Failed to authenticate user");
       setIsLoading(false);
     }
-  }, [router, fetchRooms]);
+  }, [router, fetchRooms]); // Include both dependencies
 
-  // Fixed: Only run once on mount
+  // Fixed: Include checkUser in dependency array
   useEffect(() => {
     checkUser();
-  }, []); // Empty dependency array - only run once on mount
+  }, [checkUser]); // Include checkUser dependency
 
   const createRoom = async () => {
     if (!user) {

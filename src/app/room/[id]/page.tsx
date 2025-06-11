@@ -18,6 +18,7 @@ import Chat from "@/components/room/Chat";
 import LiveCursor from "@/components/room/LiveCursor";
 import WelcomeAnimation from "@/components/room/WelcomeAnimation";
 import { useMemo } from "react";
+import ArrangementPanel from "@/components/room/ArrangementPanel";
 
 
 type RoomPageProps = {
@@ -503,10 +504,49 @@ export default function RoomPage({ params }: RoomPageProps) {
     return <RoomNotFound onBackToDashboard={() => router.push("/dashboard")} />;
   }
 
+
+  const handleArrangeIdeas = async (arrangedPositions: { id: string; x: number; y: number }[]) => {
+  if (!sessionId) return;
+  
+  try {
+    // Update all idea positions in batch
+    const updates = arrangedPositions.map(async (position) => {
+      return supabase
+        .from("ideas")
+        .update({ 
+          x: Math.max(0, position.x), 
+          y: Math.max(0, position.y) 
+        })
+        .eq("id", position.id);
+    });
+
+    await Promise.all(updates);
+
+    // Optimistically update local state for smooth UX
+    setIdeas(prev => prev.map(idea => {
+      const newPosition = arrangedPositions.find(p => p.id === idea.id);
+      if (newPosition) {
+        return { ...idea, x: newPosition.x, y: newPosition.y };
+      }
+      return idea;
+    }));
+
+  } catch (error) {
+    console.error("Error arranging ideas:", error);
+    // Optionally show error message to user
+  }
+};
+
   return (
     <div className="h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 relative overflow-hidden">
       {/* Background Elements */}
       <FloatingBackground backgroundElements={backgroundElements} />
+      <ArrangementPanel
+  ideas={ideas}
+  onArrangeIdeas={handleArrangeIdeas}
+  canvasWidth={canvasRef.current?.clientWidth || 1200}
+  canvasHeight={canvasRef.current?.clientHeight || 800}
+/>
 
       {/* Header */}
       <RoomHeader
