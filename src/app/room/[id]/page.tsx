@@ -81,6 +81,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const participantCleanupRef = useRef<NodeJS.Timeout | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Enhanced color palette
   const ideaColors = [
@@ -341,7 +342,14 @@ export default function RoomPage({ params }: RoomPageProps) {
         (payload) => {
           try {
             if (payload.eventType === "INSERT") {
-              setIdeas((prev) => [...prev, payload.new as Idea]);
+              const newIdea = payload.new as Idea;
+              setIdeas((prev) => {
+                // Check if idea already exists to prevent duplicates
+                if (prev.find(idea => idea.id === newIdea.id)) {
+                  return prev;
+                }
+                return [...prev, newIdea];
+              });
             } else if (payload.eventType === "UPDATE") {
               setIdeas((prev) =>
                 prev.map((idea) =>
@@ -366,46 +374,59 @@ export default function RoomPage({ params }: RoomPageProps) {
   }, [sessionId]);
 
   // Idea management functions
-  const addIdea = useCallback(async (eventOrCoords: React.MouseEvent | { x: number; y: number }) => {
-    if (isDragging || !sessionId) return;
+  const addIdea = useCallback(async (event: React.MouseEvent) => {
+    if (isDragging || !sessionId || !canvasRef.current) return;
 
-    let x: number, y: number;
-
-    if ('clientX' in eventOrCoords) {
-      // Handle real mouse event
-      const rect = (eventOrCoords.currentTarget as HTMLElement).getBoundingClientRect();
-      x = Math.max(0, eventOrCoords.clientX - rect.left - 75);
-      y = Math.max(0, eventOrCoords.clientY - rect.top - 50);
-    } else {
-      // Handle programmatic coordinates
-      x = Math.max(0, eventOrCoords.x);
-      y = Math.max(0, eventOrCoords.y);
-    }
+    // Prevent event from bubbling to children
+    event.stopPropagation();
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.max(0, event.clientX - rect.left - 75);
+    const y = Math.max(0, event.clientY - rect.top - 50);
 
     const randomColor = ideaColors[Math.floor(Math.random() * ideaColors.length)];
 
     try {
-      const { error } = await supabase.from("ideas").insert({
+      const { data, error } = await supabase.from("ideas").insert({
         session_id: sessionId,
         content: "✨ Double-click to edit",
         x,
         y,
         color: randomColor,
-      });
+      }).select().single();
 
       if (error) throw error;
+      
+      // Optimistically add to local state to avoid reload
+      if (data) {
+        setIdeas((prev) => {
+          // Check if idea already exists
+          if (prev.find(idea => idea.id === data.id)) {
+            return prev;
+          }
+          return [...prev, data];
+        });
+      }
     } catch (error) {
       console.error("Error adding idea:", error);
     }
   }, [isDragging, sessionId]);
 
   const addRandomIdea = useCallback(() => {
-    if (!sessionId) return;
+    if (!sessionId || !canvasRef.current) return;
     
-    const x = Math.random() * (window.innerWidth - 250);
-    const y = Math.random() * (window.innerHeight - 200) + 120;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.random() * (rect.width - 250);
+    const y = Math.random() * (rect.height - 200) + 120;
     
-    addIdea({ x, y });
+    // Create synthetic event
+    const syntheticEvent = {
+      clientX: rect.left + x + 75,
+      clientY: rect.top + y + 50,
+      stopPropagation: () => {},
+    } as React.MouseEvent;
+    
+    addIdea(syntheticEvent);
   }, [sessionId, addIdea]);
 
   const updateIdeaPosition = async (id: string, x: number, y: number) => {
@@ -734,8 +755,13 @@ export default function RoomPage({ params }: RoomPageProps) {
         )}
       </AnimatePresence>
 
-      {/* Canvas */}
-      <div className="w-full h-full cursor-crosshair" onClick={addIdea}>
+      {/* Canvas - Fixed to prevent reload on click */}
+      <div 
+        ref={canvasRef}
+        className="w-full h-full cursor-crosshair" 
+        onClick={addIdea}
+        style={{ position: 'relative' }}
+      >
         <AnimatePresence>
           {ideas.map((idea) => {
             const hoverParticipants = getIdeaHoverParticipants(idea.id);

@@ -18,7 +18,9 @@ import {
   Rocket,
   RefreshCw,
   UserPlus,
-  X
+  X,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 
 interface Room {
@@ -44,10 +46,13 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
   const [joinRoomId, setJoinRoomId] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
   const [floatingElements, setFloatingElements] = useState([]);
 
   // Creative floating elements
@@ -237,6 +242,46 @@ export default function Dashboard() {
     }
   };
 
+  const deleteRoom = async () => {
+    if (!roomToDelete || !user) return;
+
+    try {
+      setIsDeletingRoom(true);
+      setError(null);
+
+      // Check if user is the owner of the room
+      if (roomToDelete.created_by !== user.id) {
+        setError("You can only delete rooms you created");
+        return;
+      }
+
+      // Delete the room (CASCADE will handle related records)
+      const { error } = await supabase
+        .from("sessions")
+        .delete()
+        .eq("id", roomToDelete.id)
+        .eq("created_by", user.id); // Extra safety check
+
+      if (error) {
+        console.error("Error deleting room:", error);
+        throw error;
+      }
+
+      // Remove from local state
+      setRooms(prev => prev.filter(room => room.id !== roomToDelete.id));
+      
+      // Close modal
+      setShowDeleteModal(false);
+      setRoomToDelete(null);
+      
+    } catch (err) {
+      console.error("Error deleting room:", err);
+      setError(`Failed to delete room: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsDeletingRoom(false);
+    }
+  };
+
   const joinRoom = async () => {
     if (!joinRoomId.trim()) {
       setError("Please enter a room ID");
@@ -337,6 +382,16 @@ export default function Dashboard() {
     setShowInviteModal(false);
     setJoinRoomId("");
     setError(null);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setRoomToDelete(null);
+  };
+
+  const openDeleteModal = (room: Room) => {
+    setRoomToDelete(room);
+    setShowDeleteModal(true);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -620,22 +675,37 @@ export default function Dashboard() {
                   >
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-bold text-lg text-white line-clamp-2 group-hover:text-yellow-300 transition-colors">
+                        <h3 className="font-bold text-lg text-white line-clamp-2 group-hover:text-yellow-300 transition-colors flex-1 mr-2">
                           {room.title}
                         </h3>
-                        <motion.button
-                          onClick={() => copyRoomId(room.id)}
-                          className="text-white/60 hover:text-cyan-300 transition-colors p-2 rounded-xl hover:bg-white/10"
-                          title="Copy Room ID"
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                        >
-                          {copiedId === room.id ? (
-                            <Check className="w-5 h-5 text-green-400" />
-                          ) : (
-                            <Copy className="w-5 h-5" />
+                        <div className="flex gap-2">
+                          <motion.button
+                            onClick={() => copyRoomId(room.id)}
+                            className="text-white/60 hover:text-cyan-300 transition-colors p-2 rounded-xl hover:bg-white/10"
+                            title="Copy Room ID"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            {copiedId === room.id ? (
+                              <Check className="w-5 h-5 text-green-400" />
+                            ) : (
+                              <Copy className="w-5 h-5" />
+                            )}
+                          </motion.button>
+                          
+                          {/* Show delete button only for rooms created by current user */}
+                          {user && room.created_by === user.id && (
+                            <motion.button
+                              onClick={() => openDeleteModal(room)}
+                              className="text-white/60 hover:text-red-400 transition-colors p-2 rounded-xl hover:bg-white/10"
+                              title="Delete Room"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </motion.button>
                           )}
-                        </motion.button>
+                        </div>
                       </div>
                       
                       <div className="space-y-3 mb-6">
@@ -703,7 +773,7 @@ export default function Dashboard() {
                 className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white/20"
                 onClick={(e) => e.stopPropagation()}
               >
-             <div className="flex justify-between items-start mb-6">
+                <div className="flex justify-between items-start mb-6">
                   <div className="text-center flex-1">
                     <motion.div
                       className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl mb-4 shadow-lg mx-auto"
@@ -775,6 +845,79 @@ export default function Dashboard() {
                       )}
                     </motion.button>
                   </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete Room Modal */}
+        <AnimatePresence>
+          {showDeleteModal && roomToDelete && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={closeDeleteModal}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white/20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-6">
+                  <motion.div
+                    className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-2xl mb-4 shadow-lg"
+                    whileHover={{ scale: 1.1 }}
+                  >
+                    <AlertTriangle className="w-8 h-8 text-white" />
+                  </motion.div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Delete Room</h3>
+                  <p className="text-white/70">Are you sure you want to delete this room? This action cannot be undone.</p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl mb-6 border border-white/20">
+                  <p className="text-white/80 text-sm mb-1">Room to delete:</p>
+                  <p className="text-white font-medium">{roomToDelete.title}</p>
+                  <p className="text-white/60 text-xs mt-1">ID: {roomToDelete.id}</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <motion.button
+                    onClick={closeDeleteModal}
+                    className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 px-4 rounded-2xl transition-all duration-300 font-medium border border-white/20"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Cancel
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={deleteRoom}
+                    disabled={isDeletingRoom}
+                    className="flex-1 bg-gradient-to-r from-red-400 to-red-600 hover:from-red-500 hover:to-red-700 text-white py-3 px-4 rounded-2xl transition-all duration-300 font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isDeletingRoom ? (
+                      <>
+                        <motion.div
+                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-5 h-5" />
+                        Delete Room
+                      </>
+                    )}
+                  </motion.button>
                 </div>
               </motion.div>
             </motion.div>
