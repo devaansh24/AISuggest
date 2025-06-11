@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -53,7 +53,7 @@ export default function Dashboard() {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [isDeletingRoom, setIsDeletingRoom] = useState(false);
-  const [floatingElements, setFloatingElements] = useState([]);
+  const [floatingElements, setFloatingElements] = useState<any[]>([]);
 
   // Creative floating elements
   useEffect(() => {
@@ -195,6 +195,7 @@ export default function Dashboard() {
       const roomTitle = `Brainstorming Session - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       
       console.log("Creating room with title:", roomTitle);
+      console.log("Current user:", user.id);
       
       const { data: room, error: roomError } = await supabase
         .from("sessions")
@@ -208,7 +209,12 @@ export default function Dashboard() {
       console.log("Room creation result:", { room, roomError });
 
       if (roomError) {
-        console.error("Room creation error:", roomError);
+        console.error("Room creation error details:", {
+          message: roomError.message,
+          details: roomError.details,
+          hint: roomError.hint,
+          code: roomError.code
+        });
         throw roomError;
       }
       
@@ -227,16 +233,22 @@ export default function Dashboard() {
           });
           
         if (participantError) {
-          console.error("Error adding participant:", participantError);
+          console.error("Participant error details:", {
+            message: participantError.message,
+            details: participantError.details,
+            hint: participantError.hint,
+            code: participantError.code
+          });
+          // Don't throw here, just log - room creation was successful
         }
           
         router.push(`/room/${room.id}`);
       } else {
         throw new Error("Room creation returned no data");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating room:", err);
-      setError(`Failed to create room: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`Failed to create room: ${err.message || err.details || 'Unknown error'}`);
     } finally {
       setIsCreatingRoom(false);
     }
@@ -282,67 +294,133 @@ export default function Dashboard() {
     }
   };
 
-  const joinRoom = async () => {
-    if (!joinRoomId.trim()) {
-      setError("Please enter a room ID");
-      return;
-    }
+  // Add this improved joinRoom function to your Dashboard component
 
-    if (!user) {
-      console.log("No user available for joining room");
+const joinRoom = async () => {
+  if (!joinRoomId.trim()) {
+    setError("Please enter a room ID");
+    return;
+  }
+
+  try {
+    setIsJoiningRoom(true);
+    setError(null);
+    
+    // Debug: Check authentication first
+    console.log("=== JOIN ROOM DEBUG START ===");
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    
+    console.log("Auth check result:", { 
+      user: currentUser?.id, 
+      email: currentUser?.email,
+      error: authError 
+    });
+
+    if (authError) {
+      console.error("Authentication error:", authError);
+      setError("Authentication failed. Please sign in again.");
       router.push("/");
       return;
     }
 
-    try {
-      setIsJoiningRoom(true);
-      setError(null);
-      console.log("Joining room:", joinRoomId.trim());
-      
-      const { data: room, error: roomError } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", joinRoomId.trim())
-        .single();
-
-      console.log("Room lookup result:", { room, roomError });
-
-      if (roomError || !room) {
-        console.error("Room not found:", roomError);
-        setError("Room not found. Please check the room ID.");
-        return;
-      }
-
-      console.log("Adding user as participant");
-      const { error: participantError } = await supabase
-        .from("participants")
-        .upsert({
-          session_id: room.id,
-          user_id: user.id,
-          user_name: user.email?.split("@")[0] || "Anonymous",
-          color: getRandomColor(),
-          cursor_x: 0,
-          cursor_y: 0,
-          last_seen: new Date().toISOString(),
-        }, { onConflict: "session_id,user_id" });
-
-      if (participantError) {
-        console.error("Error joining as participant:", participantError);
-        setError(`Failed to join room: ${participantError.message}`);
-        return;
-      }
-
-      // Close modal and navigate
-      setShowInviteModal(false);
-      setJoinRoomId("");
-      router.push(`/room/${room.id}`);
-    } catch (err) {
-      console.error("Error joining room:", err);
-      setError(`Failed to join room: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsJoiningRoom(false);
+    if (!currentUser) {
+      console.log("No user found, redirecting to login");
+      setError("Please sign in to join a room.");
+      router.push("/");
+      return;
     }
-  };
+
+    // Update the user state if it's not set
+    if (!user) {
+      setUser(currentUser);
+    }
+
+    console.log("Searching for room:", joinRoomId.trim());
+    
+    // Look up the room
+    const { data: room, error: roomError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", joinRoomId.trim())
+      .single();
+
+    console.log("Room lookup result:", { room, roomError });
+
+    if (roomError) {
+      console.error("Room lookup error:", {
+        message: roomError.message,
+        details: roomError.details,
+        hint: roomError.hint,
+        code: roomError.code
+      });
+      
+      if (roomError.code === 'PGRST116') {
+        setError("Room not found. Please check the room ID.");
+      } else {
+        setError("Error looking up room. Please try again.");
+      }
+      return;
+    }
+
+    if (!room) {
+      setError("Room not found. Please check the room ID.");
+      return;
+    }
+
+    console.log("Room found, adding user as participant");
+    console.log("Participant data to insert:", {
+      session_id: room.id,
+      user_id: currentUser.id,
+      user_name: currentUser.email?.split("@")[0] || "Anonymous",
+      color: getRandomColor(),
+      cursor_x: 0,
+      cursor_y: 0,
+      last_seen: new Date().toISOString(),
+    });
+
+    // Add user as participant
+    const { data: participantData, error: participantError } = await supabase
+      .from("participants")
+      .upsert({
+        session_id: room.id,
+        user_id: currentUser.id,
+        user_name: currentUser.email?.split("@")[0] || "Anonymous",
+        color: getRandomColor(),
+        cursor_x: 0,
+        cursor_y: 0,
+        last_seen: new Date().toISOString(),
+      }, { onConflict: "session_id,user_id" })
+      .select();
+
+    console.log("Participant upsert result:", { participantData, participantError });
+
+    if (participantError) {
+      console.error("Participant error details:", {
+        message: participantError.message,
+        details: participantError.details,
+        hint: participantError.hint,
+        code: participantError.code
+      });
+      
+      setError(`Failed to join room: ${participantError.message || 'Unknown error'}`);
+      return;
+    }
+
+    console.log("Successfully joined room, navigating...");
+    console.log("=== JOIN ROOM DEBUG END ===");
+
+    // Close modal and navigate
+    setShowInviteModal(false);
+    setJoinRoomId("");
+    router.push(`/room/${room.id}`);
+    
+  } catch (err: any) {
+    console.error("Unexpected error joining room:", err);
+    setError(`Unexpected error: ${err.message || 'Unknown error'}`);
+  } finally {
+    setIsJoiningRoom(false);
+  }
+};
 
   const getRandomColor = () => {
     const colors = ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#84cc16"];
