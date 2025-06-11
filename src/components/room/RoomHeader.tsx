@@ -1,12 +1,33 @@
+// src/components/room/RoomHeader.tsx
 import { motion } from "framer-motion";
 import { Lightbulb, Sparkles, Users, Share2, Copy, Check } from "lucide-react";
+
+interface Idea {
+  id: string;
+  session_id: string;
+  content: string;
+  x: number;
+  y: number;
+  color: string;
+  created_at: string;
+}
+
+interface Participant {
+  user_id: string;
+  user_name: string;
+  cursor_x: number;
+  cursor_y: number;
+  color: string;
+  last_seen: string;
+  hovering_idea_id?: string | null;
+}
 
 interface RoomHeaderProps {
   session: {
     title?: string;
   } | null;
-  ideas: any[];
-  otherParticipants: any[];
+  ideas: Idea[]; // Fixed: replaced 'any[]' with proper type
+  otherParticipants: Participant[]; // Fixed: replaced 'any[]' with proper type
   sessionId: string | null;
   copied: boolean;
   myUserName: string;

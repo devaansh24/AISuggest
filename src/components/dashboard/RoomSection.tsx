@@ -3,18 +3,7 @@ import { Sparkles, RefreshCw } from "lucide-react";
 import LoadingState from "./LoadingState";
 import EmptyRoomsState from "./EmptyRoomsState";
 import RoomCard from "./RoomCard";
-
-interface Room {
-  id: string;
-  title: string;
-  created_at: string;
-  created_by: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-}
+import { Room, User } from "@/lib/types";
 
 interface RoomsSectionProps {
   rooms: Room[];

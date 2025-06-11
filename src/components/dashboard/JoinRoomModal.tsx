@@ -1,21 +1,19 @@
+
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-
-interface User {
-  id: string;
-  email: string;
-}
+import {  User } from "@/lib/types";
 
 interface JoinRoomModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
-  router: any;
+router: AppRouterInstance;
 }
 
-export default function JoinRoomModal({ isOpen, onClose, user, router }: JoinRoomModalProps) {
+export default function JoinRoomModal({ isOpen, onClose, router }: JoinRoomModalProps) {
   const [joinRoomId, setJoinRoomId] = useState("");
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +41,6 @@ export default function JoinRoomModal({ isOpen, onClose, user, router }: JoinRoo
         return;
       }
 
-      // Look up the room
       const { data: room, error: roomError } = await supabase
         .from("sessions")
         .select("*")
@@ -64,7 +61,6 @@ export default function JoinRoomModal({ isOpen, onClose, user, router }: JoinRoo
         return;
       }
 
-      // Add user as participant
       const { error: participantError } = await supabase
         .from("participants")
         .upsert({
@@ -82,17 +78,18 @@ export default function JoinRoomModal({ isOpen, onClose, user, router }: JoinRoo
         return;
       }
 
-      // Close modal and navigate
       onClose();
       setJoinRoomId("");
       router.push(`/room/${room.id}`);
       
-    } catch (err: any) {
-      setError(`Unexpected error: ${err.message || 'Unknown error'}`);
+   } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Unexpected error: ${errorMessage}`);
     } finally {
       setIsJoiningRoom(false);
     }
   };
+  
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isJoiningRoom) {

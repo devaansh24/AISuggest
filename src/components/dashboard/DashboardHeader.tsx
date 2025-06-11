@@ -1,10 +1,6 @@
 import { motion } from "framer-motion";
 import { Lightbulb, Plus, UserPlus, LogOut } from "lucide-react";
-
-interface User {
-  id: string;
-  email: string;
-}
+import {  User } from "@/lib/types";
 
 interface DashboardHeaderProps {
   user: User | null;
@@ -21,8 +17,8 @@ export default function DashboardHeader({
   onSignOut,
   isCreatingRoom
 }: DashboardHeaderProps) {
-  const getUserDisplayName = (email: string) => {
-    return email.split("@")[0];
+  const getUserDisplayName = (email: string | undefined) => {
+    return email?.split("@")[0] || "Anonymous";
   };
 
   return (

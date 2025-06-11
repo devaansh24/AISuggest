@@ -1,28 +1,17 @@
+// src/app/dashboard/page.tsx
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import FloatingBackground from "@/components/dashboard/Floatingbackground";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ErrorDisplay from "@/components/dashboard/ErrorDisplay";
 import RoomsSection from "@/components/dashboard/RoomSection";
 import JoinRoomModal from "@/components/dashboard/JoinRoomModal";
 import DeleteRoomModal from "@/components/dashboard/DeleteRoomModal";
+import { Room, User } from "@/lib/types";
 
-
-
-interface Room {
-  id: string;
-  title: string;
-  created_at: string;
-  created_by: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -35,31 +24,7 @@ export default function Dashboard() {
   const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
-  useEffect(() => {
-    checkUser();
-  }, []);
-
-  const checkUser = async () => {
-    try {
-      setIsLoading(true);
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error) throw error;
-      if (!user) {
-        router.push("/");
-        return;
-      }
-      
-      setUser(user);
-      await fetchRooms(user);
-    } catch (err) {
-      console.error("Error checking user:", err);
-      setError("Failed to authenticate user");
-      setIsLoading(false);
-    }
-  };
-
-  const fetchRooms = async (currentUser?: User) => {
+  const fetchRooms = useCallback(async (currentUser?: User) => {
     const userToUse = currentUser || user;
     if (!userToUse) {
       setIsLoading(false);
@@ -74,11 +39,19 @@ export default function Dashboard() {
         .eq("created_by", userToUse.id)
         .order("created_at", { ascending: false });
 
+      if (createdError) {
+        console.error("Error fetching created rooms:", createdError);
+      }
+
       // Fetch rooms where user has participated
       const { data: participants, error: participantsError } = await supabase
         .from("participants")
         .select("session_id")
         .eq("user_id", userToUse.id);
+
+      if (participantsError) {
+        console.error("Error fetching participants:", participantsError);
+      }
 
       // Combine and deduplicate rooms
       const allRooms = new Map<string, Room>();
@@ -93,6 +66,10 @@ export default function Dashboard() {
           .from("sessions")
           .select("*")
           .in("id", sessionIds);
+        
+        if (participatedError) {
+          console.error("Error fetching participated sessions:", participatedError);
+        }
         
         if (participatedSessions && Array.isArray(participatedSessions)) {
           participatedSessions.forEach(room => allRooms.set(room.id, room));
@@ -112,7 +89,31 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  const checkUser = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) throw error;
+      if (!user) {
+        router.push("/");
+        return;
+      }
+      
+      setUser(user);
+      await fetchRooms(user);
+    } catch (err) {
+      console.error("Error checking user:", err);
+      setError("Failed to authenticate user");
+      setIsLoading(false);
+    }
+  }, [router, fetchRooms]);
+
+  useEffect(() => {
+    checkUser();
+  }, [checkUser]);
 
   const createRoom = async () => {
     if (!user) {
@@ -150,10 +151,15 @@ export default function Dashboard() {
             last_seen: new Date().toISOString(),
           });
           
+        if (participantError) {
+          console.error("Error adding participant:", participantError);
+        }
+          
         router.push(`/room/${room.id}`);
       }
-    } catch (err: any) {
-      setError(`Failed to create room: ${err.message || 'Unknown error'}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to create room: ${errorMessage}`);
     } finally {
       setIsCreatingRoom(false);
     }

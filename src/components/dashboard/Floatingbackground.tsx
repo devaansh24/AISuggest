@@ -1,8 +1,18 @@
+
+interface FloatingElement {
+  id: number;
+  icon: string;
+  x: number;
+  y: number;
+  delay: number;
+  duration: number;
+}
+
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 export default function FloatingBackground() {
-  const [floatingElements, setFloatingElements] = useState<any[]>([]);
+const [floatingElements, setFloatingElements] = useState<FloatingElement[]>([]);
 
   useEffect(() => {
     const elements = [

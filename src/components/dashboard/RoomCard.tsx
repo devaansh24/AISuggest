@@ -9,18 +9,7 @@ import {
   Trash2,
   Star 
 } from "lucide-react";
-
-interface Room {
-  id: string;
-  title: string;
-  created_at: string;
-  created_by: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-}
+import { Room, User } from "@/lib/types";
 
 interface RoomCardProps {
   room: Room;

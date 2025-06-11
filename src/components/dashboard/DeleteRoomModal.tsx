@@ -1,13 +1,8 @@
+// src/components/dashboard/DeleteRoomModal.tsx
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Trash2 } from "lucide-react";
-
-interface Room {
-  id: string;
-  title: string;
-  created_at: string;
-  created_by: string;
-}
+import { Room } from "@/lib/types"; // Removed unused 'User' import
 
 interface DeleteRoomModalProps {
   isOpen: boolean;

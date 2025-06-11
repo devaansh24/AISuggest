@@ -36,7 +36,7 @@ export default function Chat({
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const channelRef = useRef<any>(null);
+const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -65,9 +65,10 @@ export default function Chat({
         // Scroll to bottom after loading messages
         setTimeout(scrollToBottom, 100);
       }
-    } catch (err: any) {
-      console.error("Error fetching messages:", err);
-      setError(`Failed to load messages: ${err.message || 'Unknown error'}`);
+} catch (err) {
+  const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+  setError(`Failed to load messages: ${errorMessage}`);
+
     } finally {
       setIsLoading(false);
     }
@@ -200,11 +201,11 @@ export default function Chat({
         });
       }
       
-    } catch (err: any) {
-      console.error("Error sending message:", err);
-      setError(`Failed to send message: ${err.message || 'Unknown error'}`);
-      // Restore message text if sending failed
-      setNewMessage(messageText);
+} catch (err) {
+  const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+  setError(`Failed to send message: ${errorMessage}`);
+  // Restore message text if sending failed
+  setNewMessage(messageText);
     } finally {
       setIsLoading(false);
     }

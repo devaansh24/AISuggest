@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import {  AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { v4 as uuidv4 } from "uuid";
+
+
 import RoomHeader from "@/components/room/RoomHeader";
 import FloatingBackground from "@/components/room/FloatingBackground";
 import RoomNotFound from "@/components/room/RoomNotFound";
@@ -16,8 +17,7 @@ import MobileStatsCounter from "@/components/room/MobileStatsCounter";
 import Chat from "@/components/room/Chat";
 import LiveCursor from "@/components/room/LiveCursor";
 import WelcomeAnimation from "@/components/room/WelcomeAnimation";
-
-
+import { useMemo } from "react";
 
 
 type RoomPageProps = {
@@ -53,6 +53,16 @@ interface Session {
   created_at: string;
 }
 
+// Add interface for background elements
+interface BackgroundElement {
+  id: number;
+  icon: string;
+  x: number;
+  y: number;
+  delay: number;
+  duration: number;
+}
+
 export default function RoomPage({ params }: RoomPageProps) {
   const router = useRouter();
   
@@ -63,7 +73,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [otherParticipants, setOtherParticipants] = useState<Participant[]>([]);
-  const [user, setUser] = useState<any>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [roomNotFound, setRoomNotFound] = useState(false);
   
@@ -71,7 +81,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   const [copied, setCopied] = useState(false);
   const [currentHoveringIdeaId, setCurrentHoveringIdeaId] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
-  const [backgroundElements, setBackgroundElements] = useState([]);
+  // Fix: Add proper type annotation for backgroundElements
+  const [backgroundElements, setBackgroundElements] = useState<BackgroundElement[]>([]);
   
   // User info state
   const [myUserId, setMyUserId] = useState<string>("");
@@ -84,14 +95,14 @@ export default function RoomPage({ params }: RoomPageProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Enhanced color palette
-  const ideaColors = [
-    "#FFE066", "#FF6B9D", "#4ECDC4", "#45B7D1", "#96CEB4",
-    "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE",
-  ];
+  const ideaColors = useMemo(() => [
+  "#FFE066", "#FF6B9D", "#4ECDC4", "#45B7D1", "#96CEB4",
+  "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE",
+], []);
 
   // Initialize floating background elements
   useEffect(() => {
-    const elements = Array.from({ length: 8 }, (_, i) => ({
+    const elements: BackgroundElement[] = Array.from({ length: 8 }, (_, i) => ({
       id: i,
       icon: ["💡", "✨", "🚀", "🌟", "⚡", "🎯", "💫", "🔮"][i % 8],
       x: Math.random() * 100,
@@ -114,7 +125,7 @@ export default function RoomPage({ params }: RoomPageProps) {
           return;
         }
         
-        setUser(user);
+
         setMyUserId(user.id);
         setMyUserName(user.email?.split("@")[0] || "Anonymous");
         
@@ -358,7 +369,7 @@ export default function RoomPage({ params }: RoomPageProps) {
   }, [sessionId]);
 
   // Idea management functions
-  const addIdea = useCallback(async (event: React.MouseEvent) => {
+ const addIdea = useCallback(async (event: React.MouseEvent) => {
     if (isDragging || !sessionId || !canvasRef.current) return;
 
     event.stopPropagation();
@@ -391,7 +402,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     } catch (error) {
       console.error("Error adding idea:", error);
     }
-  }, [isDragging, sessionId]);
+  }, [isDragging, sessionId,ideaColors]);
 
   const addRandomIdea = useCallback(() => {
     if (!sessionId || !canvasRef.current) return;

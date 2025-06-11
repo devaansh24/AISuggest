@@ -5,6 +5,14 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lightbulb, Sparkles, Users, Zap, ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
+interface FloatingIdea {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  delay: number;
+}
+
 export default function Home() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -13,11 +21,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [floatingIdeas, setFloatingIdeas] = useState([]);
+  const [floatingIdeas, setFloatingIdeas] = useState<FloatingIdea[]>([]);
 
-  // Creative floating ideas animation
   useEffect(() => {
-    const ideas = [
+    const ideas: FloatingIdea[] = [
       { id: 1, text: "💡", x: 10, y: 20, delay: 0 },
       { id: 2, text: "🚀", x: 85, y: 15, delay: 1 },
       { id: 3, text: "✨", x: 20, y: 80, delay: 2 },
@@ -33,7 +40,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -41,11 +48,7 @@ export default function Home() {
     if (error) {
       setError(error.message);
     } else {
-      if (data.user && !data.user.email_confirmed_at) {
-        setError("Please check your email to confirm your account before signing in.");
-      } else {
-        router.push("/dashboard");
-      }
+      setError("Please check your email to confirm your account before signing in.");
     }
     setIsLoading(false);
   };
@@ -55,7 +58,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });

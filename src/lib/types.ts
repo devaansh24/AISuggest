@@ -1,9 +1,23 @@
 // Add these type definitions to match the schema
+import type { User as SupabaseUser } from '@supabase/auth-js';
+export type User = SupabaseUser;
+
 export interface Session {
   id: string;
   title: string;
   created_at: string;
 }
+
+
+
+
+export interface Room {
+  id: string;
+  title: string;
+  created_at: string;
+  created_by: string;
+}
+
 
 export interface Idea {
   id: string;
