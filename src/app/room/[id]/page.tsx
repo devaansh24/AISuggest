@@ -2,9 +2,25 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { Plus, Users, Copy, Share2, Check } from "lucide-react";
+import { 
+  Plus, 
+  Users, 
+  Copy, 
+  Share2, 
+  Check, 
+  Lightbulb, 
+  Sparkles, 
+  Zap,
+  Home,
+  Palette,
+  MessageCircle,
+  Settings,
+  Star,
+  Brain,
+  Rocket
+} from "lucide-react";
 import LiveCursor from "@/components/LiveCursor";
 import Chat from "@/components/Chat";
 import { v4 as uuidv4 } from "uuid";
@@ -55,6 +71,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   const [roomNotFound, setRoomNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
   const [currentHoveringIdeaId, setCurrentHoveringIdeaId] = useState<string | null>(null);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [backgroundElements, setBackgroundElements] = useState([]);
   
   // User info state
   const [myUserId, setMyUserId] = useState<string>("");
@@ -63,6 +81,33 @@ export default function RoomPage({ params }: RoomPageProps) {
   
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const participantCleanupRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enhanced color palette
+  const ideaColors = [
+    "#FFE066", // Warm yellow
+    "#FF6B9D", // Pink
+    "#4ECDC4", // Teal
+    "#45B7D1", // Sky blue
+    "#96CEB4", // Mint green
+    "#FFEAA7", // Light yellow
+    "#DDA0DD", // Plum
+    "#98D8C8", // Mint
+    "#F7DC6F", // Golden
+    "#BB8FCE", // Light purple
+  ];
+
+  // Floating background elements
+  useEffect(() => {
+    const elements = Array.from({ length: 8 }, (_, i) => ({
+      id: i,
+      icon: ["💡", "✨", "🚀", "🌟", "⚡", "🎯", "💫", "🔮"][i % 8],
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      delay: i * 0.5,
+      duration: 3 + Math.random() * 2,
+    }));
+    setBackgroundElements(elements);
+  }, []);
 
   // Check authentication and set user info
   useEffect(() => {
@@ -80,10 +125,10 @@ export default function RoomPage({ params }: RoomPageProps) {
         setMyUserId(user.id);
         setMyUserName(user.email?.split("@")[0] || "Anonymous");
         
-        // Set a consistent color for the authenticated user
-        const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
-        const userColorIndex = user.id.charCodeAt(0) % colors.length;
-        setMyColor(colors[userColorIndex]);
+        // Enhanced color palette for users
+        const userColors = ["#FF6B9D", "#4ECDC4", "#45B7D1", "#96CEB4", "#DDA0DD", "#F7DC6F"];
+        const userColorIndex = user.id.charCodeAt(0) % userColors.length;
+        setMyColor(userColors[userColorIndex]);
         
         setIsLoading(false);
       } catch (err) {
@@ -337,13 +382,12 @@ export default function RoomPage({ params }: RoomPageProps) {
       y = Math.max(0, eventOrCoords.y);
     }
 
-    const colors = ["#fbbf24", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#06b6d4"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const randomColor = ideaColors[Math.floor(Math.random() * ideaColors.length)];
 
     try {
       const { error } = await supabase.from("ideas").insert({
         session_id: sessionId,
-        content: "Double-click to edit",
+        content: "✨ Double-click to edit",
         x,
         y,
         color: randomColor,
@@ -358,8 +402,8 @@ export default function RoomPage({ params }: RoomPageProps) {
   const addRandomIdea = useCallback(() => {
     if (!sessionId) return;
     
-    const x = Math.random() * (window.innerWidth - 200);
-    const y = Math.random() * (window.innerHeight - 200) + 100;
+    const x = Math.random() * (window.innerWidth - 250);
+    const y = Math.random() * (window.innerHeight - 200) + 120;
     
     addIdea({ x, y });
   }, [sessionId, addIdea]);
@@ -425,7 +469,7 @@ export default function RoomPage({ params }: RoomPageProps) {
     window.addEventListener("mousemove", handleMouseMove);
 
     // Set up participant cleanup interval
-    participantCleanupRef.current = setInterval(cleanupOldParticipants, 30000); // Clean up every 30 seconds
+    participantCleanupRef.current = setInterval(cleanupOldParticipants, 30000);
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
@@ -450,11 +494,43 @@ export default function RoomPage({ params }: RoomPageProps) {
     cleanupOldParticipants,
   ]);
 
-  // Show loading state while authenticating or params are being resolved
+  // Show loading state
   if (isLoading || !sessionId || !myUserId) {
     return (
-      <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading room...</div>
+      <div className="h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 flex items-center justify-center relative overflow-hidden">
+        {/* Animated Background */}
+        <motion.div
+          className="absolute inset-0 overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-pink-400/20 to-purple-400/20 rounded-full blur-3xl"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 8, repeat: Infinity }}
+          />
+          <motion.div
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-full blur-3xl"
+            animate={{ scale: [1.2, 1, 1.2], opacity: [0.5, 0.3, 0.5] }}
+            transition={{ duration: 8, repeat: Infinity, delay: 4 }}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/20 text-center"
+        >
+          <motion.div
+            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl mb-4"
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          >
+            <Brain className="w-8 h-8 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold text-white mb-2">Loading Your Creative Space</h2>
+          <p className="text-white/80">Preparing the innovation canvas...</p>
+        </motion.div>
       </div>
     );
   }
@@ -462,189 +538,378 @@ export default function RoomPage({ params }: RoomPageProps) {
   // Show room not found error
   if (roomNotFound) {
     return (
-      <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-lg border border-white/20 text-center max-w-md">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Room Not Found</h2>
-          <p className="text-gray-600 mb-6">The room you're looking for doesn't exist or has been deleted.</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+      <div className="h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 flex items-center justify-center relative overflow-hidden">
+        {/* Animated Background */}
+        <motion.div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-pink-400/20 to-purple-400/20 rounded-full blur-3xl"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 8, repeat: Infinity }}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/20 text-center max-w-md mx-4"
+        >
+          <motion.div
+            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-red-400 to-pink-500 rounded-2xl mb-4"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2 }}
           >
-            Back to Dashboard
-          </button>
-        </div>
+            <Zap className="w-8 h-8 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold text-white mb-4">Oops! Room Not Found</h2>
+          <p className="text-white/80 mb-6">This creative space doesn't exist or has been archived. Let's get you back to innovation!</p>
+          <motion.button
+            onClick={() => router.push("/dashboard")}
+            className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-6 py-3 rounded-2xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="flex items-center gap-2">
+              <Home className="w-5 h-5" />
+              Back to Dashboard
+            </div>
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100 relative overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-pink-400/10 to-purple-400/10 rounded-full blur-3xl"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity }}
+        />
+        <motion.div
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-400/10 to-blue-400/10 rounded-full blur-3xl"
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.5, 0.3, 0.5] }}
+          transition={{ duration: 8, repeat: Infinity, delay: 4 }}
+        />
+        
+        {/* Floating icons */}
+        {backgroundElements.map((element) => (
+          <motion.div
+            key={element.id}
+            className="absolute text-2xl opacity-10"
+            style={{ left: `${element.x}%`, top: `${element.y}%` }}
+            animate={{
+              y: [-20, 20, -20],
+              rotate: [-10, 10, -10],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              duration: element.duration,
+              repeat: Infinity,
+              delay: element.delay,
+              ease: "easeInOut",
+            }}
+          >
+            {element.icon}
+          </motion.div>
+        ))}
+      </div>
+
       {/* Header */}
-      <div className="absolute top-6 left-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg z-10 border border-white/20">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="absolute top-4 left-4 lg:top-6 lg:left-6 bg-white/10 backdrop-blur-xl p-3 lg:p-4 rounded-2xl shadow-2xl z-10 border border-white/20"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+          <motion.div
+            className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
           <div>
-            <h1 className="font-bold text-lg text-gray-800">{session?.title || "Brainstorming Room"}</h1>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
+            <h1 className="font-bold text-lg text-white flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-yellow-300" />
+              {session?.title || "Brainstorming Room"}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-white/80">
               <span className="flex items-center gap-1">
-                <Plus className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
                 {ideas.length} ideas
               </span>
               <span className="flex items-center gap-1">
                 <Users className="w-4 h-4" />
-                {otherParticipants.length + 1} online
+                {otherParticipants.length + 1} creators
               </span>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Room ID and Invite Section */}
-      <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg z-10 border border-white/20">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="absolute top-4 right-4 lg:top-6 lg:right-6 bg-white/10 backdrop-blur-xl p-3 lg:p-4 rounded-2xl shadow-2xl z-10 border border-white/20"
+      >
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Share2 className="w-4 h-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">Invite Others</span>
+            <Share2 className="w-4 h-4 text-white/80" />
+            <span className="text-sm font-medium text-white">Invite Creators</span>
           </div>
-          <div className="flex items-center gap-2 bg-gray-100 p-2 rounded-lg">
-            <code className="text-sm text-gray-600 flex-1 font-mono">
+          <div className="flex items-center gap-2 bg-white/10 p-2 rounded-xl border border-white/20">
+            <code className="text-sm text-white/90 flex-1 font-mono">
               {sessionId?.slice(0, 8)}...
             </code>
-            <button
+            <motion.button
               onClick={copyRoomId}
-              className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+              className="flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-3 py-1 rounded-xl text-xs font-medium transition-all duration-300 shadow-lg"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? "Copied!" : "Copy ID"}
-            </button>
+              {copied ? "Copied!" : "Copy"}
+            </motion.button>
           </div>
-          <p className="text-xs text-gray-500">Share this Room ID with others to collaborate</p>
+          <p className="text-xs text-white/60">Share this Room ID to collaborate</p>
         </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg z-10 border border-white/20">
-        <div className="text-sm text-gray-600 space-y-1">
-          <p>• Click anywhere to add an idea</p>
-          <p>• Drag sticky notes to move them</p>
-          <p>• Double-click to edit content</p>
-          <p>• Click × to delete</p>
-          <p>• Use chat to discuss ideas</p>
-        </div>
-      </div>
+      </motion.div>
 
       {/* User Info */}
-      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-xl shadow-lg z-10 border border-white/20">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <div 
-            className="w-3 h-3 rounded-full" 
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white/10 backdrop-blur-xl p-2 px-4 rounded-xl shadow-2xl z-10 border border-white/20"
+      >
+        <div className="flex items-center gap-2 text-sm text-white">
+          <motion.div 
+            className="w-3 h-3 rounded-full border-2 border-white/50" 
             style={{ backgroundColor: myColor }}
-          ></div>
-          <span>Welcome, {myUserName}</span>
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
+          <span>Welcome, <span className="font-medium">{myUserName}</span> ✨</span>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Instructions Toggle */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.3 }}
+        className="absolute bottom-4 right-4 lg:bottom-6 lg:right-6 bg-white/10 backdrop-blur-xl p-3 rounded-full shadow-2xl z-10 border border-white/20 hover:bg-white/20 transition-all duration-300"
+        onClick={() => setShowInstructions(!showInstructions)}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+      >
+        <Settings className="w-5 h-5 text-white" />
+      </motion.button>
+
+      {/* Instructions Panel */}
+      <AnimatePresence>
+        {showInstructions && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="absolute bottom-20 right-4 lg:bottom-20 lg:right-6 bg-white/10 backdrop-blur-xl p-4 rounded-2xl shadow-2xl z-10 border border-white/20 max-w-xs"
+          >
+            <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+              <Star className="w-4 h-4 text-yellow-300" />
+              Creative Controls
+            </h3>
+            <div className="text-sm text-white/80 space-y-2">
+              <p>✨ <strong>Click anywhere</strong> to spark an idea</p>
+              <p>🚀 <strong>Drag notes</strong> to organize thoughts</p>
+              <p>✍️ <strong>Double-click</strong> to edit content</p>
+              <p>🗑️ <strong>Click ×</strong> to remove ideas</p>
+              <p>💬 <strong>Use chat</strong> to collaborate</p>
+              <p>🎨 <strong>Ideas auto-color</strong> for visual magic</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Canvas */}
       <div className="w-full h-full cursor-crosshair" onClick={addIdea}>
-        {ideas.map((idea) => {
-          const hoverParticipants = getIdeaHoverParticipants(idea.id);
-          const isBeingHovered = hoverParticipants.length > 0;
-          
-          return (
-            <motion.div
-              key={idea.id}
-              className="absolute cursor-move group"
-              style={{ left: `${idea.x}px`, top: `${idea.y}px` }}
-              drag
-              dragMomentum={false}
-              onDragStart={() => setIsDragging(true)}
-              onDragEnd={(e, info) => {
-                setIsDragging(false);
-                const newX = Math.max(0, idea.x + info.offset.x);
-                const newY = Math.max(0, idea.y + info.offset.y);
-                updateIdeaPosition(idea.id, newX, newY);
-              }}
-              onMouseEnter={() => handleIdeaMouseEnter(idea.id)}
-              onMouseLeave={handleIdeaMouseLeave}
-              whileHover={{ scale: 1.02, rotate: 1 }}
-              whileDrag={{ scale: 1.05, rotate: 5, zIndex: 1000 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div
-                className={`w-40 h-32 p-4 rounded-lg shadow-lg border-2 backdrop-blur-sm transition-all duration-200 ${
-                  isBeingHovered ? 'border-blue-400 shadow-xl' : 'border-white/50'
-                }`}
-                style={{ backgroundColor: `${idea.color}90` }}
+        <AnimatePresence>
+          {ideas.map((idea) => {
+            const hoverParticipants = getIdeaHoverParticipants(idea.id);
+            const isBeingHovered = hoverParticipants.length > 0;
+            
+            return (
+              <motion.div
+                key={idea.id}
+                className="absolute cursor-move group"
+                style={{ left: `${idea.x}px`, top: `${idea.y}px` }}
+                initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.5, rotate: 10 }}
+                drag
+                dragMomentum={false}
+                onDragStart={() => setIsDragging(true)}
+                onDragEnd={(e, info) => {
+                  setIsDragging(false);
+                  const newX = Math.max(0, idea.x + info.offset.x);
+                  const newY = Math.max(0, idea.y + info.offset.y);
+                  updateIdeaPosition(idea.id, newX, newY);
+                }}
+                onMouseEnter={() => handleIdeaMouseEnter(idea.id)}
+                onMouseLeave={handleIdeaMouseLeave}
+                whileHover={{ 
+                  scale: 1.05, 
+                  rotate: 2,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                }}
+                whileDrag={{ 
+                  scale: 1.1, 
+                  rotate: 5, 
+                  zIndex: 1000,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)"
+                }}
+                onClick={(e) => e.stopPropagation()}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
-                {editingId === idea.id ? (
-                  <textarea
-                    defaultValue={idea.content}
-                    className="w-full h-full bg-transparent border-none outline-none resize-none text-sm font-medium text-gray-800 placeholder-gray-500"
-                    autoFocus
-                    onBlur={(e) => updateIdeaContent(idea.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        updateIdeaContent(idea.id, e.currentTarget.value);
-                      }
-                    }}
-                    placeholder="Write your idea..."
-                  />
-                ) : (
-                  <div
-                    onDoubleClick={() => setEditingId(idea.id)}
-                    className="w-full h-full text-sm font-medium text-gray-800 overflow-hidden cursor-text"
-                  >
-                    {idea.content}
-                  </div>
-                )}
-
-                <button
-                  onClick={() => deleteIdea(idea.id)}
-                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 text-sm opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg"
+                <div
+                  className={`w-40 h-32 lg:w-48 lg:h-36 p-4 rounded-2xl shadow-2xl border-2 backdrop-blur-sm transition-all duration-300 ${
+                    isBeingHovered 
+                      ? 'border-white/60 shadow-2xl ring-4 ring-white/20' 
+                      : 'border-white/30'
+                  }`}
+                  style={{ 
+                    backgroundColor: idea.color,
+                    boxShadow: isBeingHovered 
+                      ? `0 20px 40px -12px ${idea.color}40, 0 0 0 1px rgba(255,255,255,0.1)` 
+                      : `0 10px 25px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.1)`
+                  }}
                 >
-                  ×
-                </button>
+                  {editingId === idea.id ? (
+                    <textarea
+                      defaultValue={idea.content}
+                      className="w-full h-full bg-transparent border-none outline-none resize-none text-sm lg:text-base font-medium text-gray-800 placeholder-gray-600"
+                      autoFocus
+                      onBlur={(e) => updateIdeaContent(idea.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          updateIdeaContent(idea.id, e.currentTarget.value);
+                        }
+                      }}
+                      placeholder="✨ Your brilliant idea..."
+                    />
+                  ) : (
+                    <div
+                      onDoubleClick={() => setEditingId(idea.id)}
+                      className="w-full h-full text-sm lg:text-base font-medium text-gray-800 overflow-hidden cursor-text leading-relaxed"
+                    >
+                      {idea.content}
+                    </div>
+                  )}
 
-                {/* Show hover indicators */}
-                {isBeingHovered && (
-                  <div className="absolute -top-8 left-0 flex gap-1">
-                    {hoverParticipants.map((participant, index) => (
-                      <div
-                        key={participant.user_id}
-                        className="px-2 py-1 text-xs font-medium text-white rounded shadow-lg"
-                        style={{ backgroundColor: participant.color }}
-                      >
-                        {participant.user_name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
+                  <motion.button
+                    onClick={() => deleteIdea(idea.id)}
+                    className="absolute -top-3 -right-3 bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white rounded-full w-7 h-7 text-lg font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg flex items-center justify-center"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                  >
+                    ×
+                  </motion.button>
+
+                  {/* Collaboration indicators */}
+                  {isBeingHovered && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute -top-12 left-0 flex gap-1 flex-wrap max-w-48"
+                    >
+                      {hoverParticipants.map((participant) => (
+                        <motion.div
+                          key={participant.user_id}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="px-2 py-1 text-xs font-medium text-white rounded-xl shadow-lg backdrop-blur-sm border border-white/20"
+                          style={{ backgroundColor: `${participant.color}90` }}
+                        >
+                          👀 {participant.user_name}
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+
+                  {/* Idea sparkle effect */}
+                  <motion.div
+                    className="absolute -top-1 -right-1 text-yellow-300"
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 180, 360],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    ✨
+                  </motion.div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
-      {/* Floating Action Button */}
-      <motion.button
-        className="fixed bottom-8 left-8 bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full shadow-2xl z-20"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={addRandomIdea}
-      >
-        <Plus className="w-6 h-6" />
-      </motion.button>
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-4 left-4 lg:bottom-8 lg:left-8 flex flex-col gap-3 z-20">
+        {/* Add Random Idea */}
+        <motion.button
+          className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white p-3 lg:p-4 rounded-2xl shadow-2xl border border-white/20"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={addRandomIdea}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
+        </motion.button>
 
-      {/* Back to Dashboard Button */}
-      <motion.button
-        className="fixed bottom-8 left-24 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-full shadow-2xl z-20 text-sm font-medium"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => router.push("/dashboard")}
+        {/* Back to Dashboard */}
+        <motion.button
+          className="bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white px-3 py-2 lg:px-4 lg:py-3 rounded-2xl shadow-2xl text-sm lg:text-base font-medium border border-white/20 transition-all duration-300"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => router.push("/dashboard")}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="flex items-center gap-2">
+            <Home className="w-4 h-4 lg:w-5 lg:h-5" />
+            <span className="hidden lg:inline">Dashboard</span>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Ideas Counter - Mobile Friendly */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white/10 backdrop-blur-xl px-4 py-2 rounded-2xl shadow-2xl border border-white/20 z-10 lg:hidden"
       >
-        Back to Dashboard
-      </motion.button>
+        <div className="flex items-center gap-2 text-sm text-white">
+          <Lightbulb className="w-4 h-4 text-yellow-300" />
+          <span>{ideas.length} ideas</span>
+          <Users className="w-4 h-4 ml-2" />
+          <span>{otherParticipants.length + 1}</span>
+        </div>
+      </motion.div>
 
       {/* Chat Component */}
       <Chat
@@ -658,6 +923,83 @@ export default function RoomPage({ params }: RoomPageProps) {
       {otherParticipants.map((participant) => (
         <LiveCursor key={participant.user_id} participant={participant} />
       ))}
+
+      {/* Welcome Animation for First Visit */}
+      <AnimatePresence>
+        {ideas.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-5"
+          >
+            <motion.div
+              className="text-center text-white/60 max-w-md mx-4"
+              animate={{
+                y: [-10, 10, -10],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <motion.div
+                className="text-6xl lg:text-8xl mb-4"
+                animate={{
+                  rotate: [0, 10, -10, 0],
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                💡
+              </motion.div>
+              <h2 className="text-2xl lg:text-3xl font-bold mb-2">Your Creative Canvas Awaits</h2>
+              <p className="text-lg lg:text-xl">Click anywhere to spark your first brilliant idea! ✨</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Celebration Effect for New Ideas */}
+      <AnimatePresence>
+        {ideas.length > 0 && ideas.length % 5 === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 pointer-events-none z-30"
+          >
+            {Array.from({ length: 20 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-2xl"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                }}
+                initial={{ scale: 0, rotate: 0 }}
+                animate={{
+                  scale: [0, 1, 0],
+                  rotate: [0, 360],
+                  y: [-50, -100],
+                }}
+                transition={{
+                  duration: 2,
+                  delay: i * 0.1,
+                  ease: "easeOut",
+                }}
+              >
+                {["🎉", "✨", "🚀", "💫", "🌟"][i % 5]}
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
