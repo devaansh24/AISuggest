@@ -12,7 +12,6 @@ import JoinRoomModal from "@/components/dashboard/JoinRoomModal";
 import DeleteRoomModal from "@/components/dashboard/DeleteRoomModal";
 import { Room, User } from "@/lib/types";
 
-
 export default function Dashboard() {
   const router = useRouter();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -24,9 +23,10 @@ export default function Dashboard() {
   const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
-  const fetchRooms = useCallback(async (currentUser?: User) => {
-    const userToUse = currentUser || user;
-    if (!userToUse) {
+  // Fixed: Remove user dependency to prevent infinite loops
+  const fetchRooms = useCallback(async (targetUser?: User) => {
+    // Use targetUser parameter instead of user state to avoid dependency issues
+    if (!targetUser) {
       setIsLoading(false);
       return;
     }
@@ -36,7 +36,7 @@ export default function Dashboard() {
       const { data: createdRooms, error: createdError } = await supabase
         .from("sessions")
         .select("*")
-        .eq("created_by", userToUse.id)
+        .eq("created_by", targetUser.id)
         .order("created_at", { ascending: false });
 
       if (createdError) {
@@ -47,7 +47,7 @@ export default function Dashboard() {
       const { data: participants, error: participantsError } = await supabase
         .from("participants")
         .select("session_id")
-        .eq("user_id", userToUse.id);
+        .eq("user_id", targetUser.id);
 
       if (participantsError) {
         console.error("Error fetching participants:", participantsError);
@@ -89,8 +89,9 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []); // Empty dependency array to prevent infinite loops
 
+  // Fixed: Remove fetchRooms dependency to prevent infinite loops
   const checkUser = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -103,7 +104,7 @@ export default function Dashboard() {
       }
       
       setUser(user);
-      await fetchRooms(user);
+      await fetchRooms(user); // Pass user directly as parameter
     } catch (err) {
       console.error("Error checking user:", err);
       setError("Failed to authenticate user");
@@ -111,9 +112,10 @@ export default function Dashboard() {
     }
   }, [router, fetchRooms]);
 
+  // Fixed: Only run once on mount
   useEffect(() => {
     checkUser();
-  }, [checkUser]);
+  }, []); // Empty dependency array - only run once on mount
 
   const createRoom = async () => {
     if (!user) {
@@ -202,10 +204,13 @@ export default function Dashboard() {
     }
   };
 
+  // Fixed: Use user directly instead of calling fetchRooms
   const retryFetchRooms = () => {
-    setError(null);
-    setIsLoading(true);
-    fetchRooms();
+    if (user) {
+      setError(null);
+      setIsLoading(true);
+      fetchRooms(user); // Pass user directly
+    }
   };
 
   return (
